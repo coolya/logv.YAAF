@@ -10,10 +10,12 @@ namespace logv.YAAF
         private readonly List<AspectParameter> _aspects;
         private readonly Type _returnType;
 
-        public AspectContext(string name, Type returnType)
+
+        public AspectContext(string name, Type returnType, Type implemtingType)
         {
             this._aspects = new List<AspectParameter>();
             this.Name = name;
+            this.ImplemtingType = implemtingType;
             this._returnType = returnType;
         }
 
@@ -21,6 +23,24 @@ namespace logv.YAAF
         {
             get;
             private set;
+        }
+
+        public Type ImplemtingType
+        {
+            get;
+            private set;
+        }
+
+        public bool IsHandeled
+        {
+            get;
+            set;
+        }
+
+        public bool IsManipulated
+        {
+            get;
+            set;
         }
 
         public bool IsVoid
@@ -38,12 +58,22 @@ namespace logv.YAAF
             get { return this[ReturnValueName]; }
         }
 
+        public Exception Exception
+        {
+            get { return this[ExceptionValueName] as Exception; }
+        }
+
         public void Add(AspectParameter parameter)
         {
-            if(this._aspects.Any(item => item.Name == parameter.Name))
+            if (this._aspects.Any(item => item.Name == parameter.Name))
                 throw new ArgumentException(string.Format("Container allready contains item with name {0}", parameter.Name));
 
             this._aspects.Add(parameter);
+        }
+
+        public bool Handeled()
+        {
+            return IsHandeled;
         }
 
         public object this[string name]
@@ -57,10 +87,15 @@ namespace logv.YAAF
             }
         }
 
-       
+
         public static string ReturnValueName
         {
             get { return "Aspect:Callee:ReturnValue"; }
+        }
+
+        public static string ExceptionValueName
+        {
+            get { return "Aspect:Callee:ExceptionValue"; }
         }
 
         /// <summary>
@@ -88,3 +123,4 @@ namespace logv.YAAF
         }
     }
 }
+

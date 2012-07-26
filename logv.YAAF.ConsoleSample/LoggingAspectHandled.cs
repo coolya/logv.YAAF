@@ -7,7 +7,7 @@ using logv.YAAF.Attributes;
 
 namespace logv.YAAF.ConsoleSample
 {
-    public class LoggingAspect : IAspect
+    public class LoggingAspectHandled : IAspect
     {
         public void Invoke(AspectContext container, AspectIntercept intercept)
         {
@@ -35,6 +35,7 @@ namespace logv.YAAF.ConsoleSample
             if (intercept == AspectIntercept.Exception)
             {
                 Console.WriteLine(string.Format("EXCPETION in {0} with message: {1}", container.Name, container.Exception.Message));
+                container.IsHandeled = true;
             }
         }
     }

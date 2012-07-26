@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<package >
+  <metadata>
+    <id>$id$</id>
+    <version>$version$</version>
+    <title>$title$</title>
+    <authors>$author$</authors>
+    <owners>$author$</owners>
+    <licenseUrl>http://www.apache.org/licenses/LICENSE-2.0.html</licenseUrl>
+    <projectUrl>https://github.com/coolya/logv.YAAF</projectUrl>
+    <iconUrl>https://secure.gravatar.com/avatar/89bf5c1387f3e4f706be95d6bd923b13?s=140</iconUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>$description$</description>
+    <releaseNotes>Initial upload</releaseNotes>
+    <copyright>Copyright 2012</copyright>
+    <tags>AOP Servicelocator IOC2</tags>
+  </metadata>
+</package>

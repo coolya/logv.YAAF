@@ -48,6 +48,8 @@
     <Compile Include="Attributes\EpilogAspectAttribute.cs" />
     <Compile Include="Attributes\PrologAspectAttribute.cs" />
     <Compile Include="IAspect.cs" />
+    <Compile Include="IManipulatingAspect.cs" />
+    <Compile Include="ManipulatingAspect.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ProxyBuilder\ProxyBuilder.cs" />
     <Compile Include="ServiceLocator\ServiceLocator.cs" />

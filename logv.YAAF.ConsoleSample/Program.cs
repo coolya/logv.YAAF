@@ -14,8 +14,28 @@ namespace logv.YAAF.ConsoleSample
             var locator = ctx.CreateServiceLocator();
 
             var instance = locator.GetInstance<ITest>();
-
             instance.Login("testuser", "secret");
+
+            var ex = locator.GetInstance<IEx1>();
+
+            try
+            {
+                ex.Run();
+            }
+            catch (Exception exception)
+            {
+                Console.WriteLine(exception);
+            }
+
+            var willNotThrow = locator.GetInstance<IEx2>();
+
+            willNotThrow.Run();
+
+            var dummy = locator.GetInstance<IEx3>();
+
+            dummy.Login("test", "ex3");
+            dummy.Run();
+            var ret = dummy.GetData();
 
             Console.ReadLine();
         }

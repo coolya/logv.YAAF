@@ -4,6 +4,6 @@ namespace logv.YAAF
 {
     public interface IAspect
     {
-        void Invoke(AspectContext container, AspectIntercept callingPoint);
+        void Invoke(AspectContext container, AspectIntercept intercept);
     }
 }
