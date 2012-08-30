@@ -35,7 +35,7 @@ namespace logv.YAAF.ConsoleSample
 
             dummy.Login("test", "ex3");
             dummy.Run();
-            var ret = dummy.GetData();
+            dummy.GetData();
 
             Console.ReadLine();
         }

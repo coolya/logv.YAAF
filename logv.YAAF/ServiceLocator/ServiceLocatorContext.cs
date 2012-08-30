@@ -78,22 +78,37 @@ namespace logv.YAAF.ServiceLocator
             _constructorsByType = new Dictionary<Type, object>();
         }
 
-        internal Type Resolve(Type interfaceType)
+        protected virtual Type ResolveInternal(Type interfaceType)
         {
             return _locator(interfaceType);
         }
 
-        internal bool? TypeIsAop(Type t)
+        internal Type Resolve(Type interfaceType)
+        {
+            return ResolveInternal(interfaceType);
+        }
+
+        protected virtual bool? TypeIsAopInternal(Type t)
         {
             return this._typeIsAop.ContainsKey(t) ? this._typeIsAop[t] : (bool?)null;
         }
 
-        internal void AddAopType(Type t, bool isAop)
+        internal bool? TypeIsAop(Type t)
+        {
+            return TypeIsAopInternal(t);            
+        }
+
+        protected virtual void AddAopTypeInternal(Type t, bool isAop)
         {
             _typeIsAop.Add(t, isAop);
         }
 
-        internal T GetSingletone<T>()
+        internal void AddAopType(Type t, bool isAop)
+        {
+            AddAopTypeInternal(t, isAop);
+        }
+
+        protected virtual T GetSingletoneInternal<T>()
         {
             if (this._singletonesByType.ContainsKey(typeof(T)))
                 return (T)this._singletonesByType[typeof(T)];
@@ -101,17 +116,32 @@ namespace logv.YAAF.ServiceLocator
             return default(T);
         }
 
-        internal void AddSingletone<T>(T instance)
+        internal T GetSingletone<T>()
+        {
+            return GetSingletoneInternal<T>();
+        }
+
+        protected virtual void AddSingletoneInternal<T>(T instance)
         {
             this._singletonesByType.Add(typeof(T), instance);
         }
 
-        internal void AddConstructorToCache<T>(Func<T> func)
+        internal void AddSingletone<T>(T instance)
+        {
+            AddSingletoneInternal<T>(instance);
+        }
+
+        protected virtual void AddConstructorToCacheInternal<T>(Func<T> func)
         {
             _constructorsByType.Add(typeof(T), func);
         }
 
-        internal Func<T> GetConstructor<T>()
+        internal void AddConstructorToCache<T>(Func<T> func)
+        {
+            AddConstructorToCacheInternal<T>(func);
+        }
+
+        protected virtual Func<T> GetConstructorInternal<T>()
         {
             if (_constructorsByType.ContainsKey(typeof(T)))
                 return (Func<T>)_constructorsByType[typeof(T)];
@@ -119,7 +149,12 @@ namespace logv.YAAF.ServiceLocator
             return null;
         }
 
-        public ServiceLocator CreateServiceLocator()
+        internal Func<T> GetConstructor<T>()
+        {
+            return GetConstructorInternal<T>();
+        }
+
+        public virtual ServiceLocator CreateServiceLocator()
         {
             return new ServiceLocator(this);
         }

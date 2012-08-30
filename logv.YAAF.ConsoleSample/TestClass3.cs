@@ -17,9 +17,9 @@ namespace logv.YAAF.ConsoleSample
 
         }
 
-        public object GetData()
+        public void GetData()
         {
-            throw new NotImplementedException();
+            Console.WriteLine("Wahooo");
         }
     }
 }

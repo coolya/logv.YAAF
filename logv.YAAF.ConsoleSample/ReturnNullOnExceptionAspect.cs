@@ -7,18 +7,11 @@ using logv.YAAF.Attributes;
 
 namespace logv.YAAF.ConsoleSample
 {
-    public class ReturnNullOnExceptionAspect : ManipulatingAspect
+    public class ReturnNullOnExceptionAspect : IAspect
     {
-        protected override void InvokeInternal(AspectContext container, AspectIntercept intercept)
+        public void Invoke(AspectContext container, AspectIntercept intercept)
         {
-            Console.WriteLine("ReturnNullOnExceptionAspect: without return value");
-        }
-
-        protected override object ManipulateInternal(AspectContext container, AspectIntercept intercept)
-        {
-            Console.WriteLine("ReturnNullOnExceptionAspect: replacing return value with null");
-            container.IsHandeled = true;
-            return null;
+            container.Implementation();
         }
     }
 }
