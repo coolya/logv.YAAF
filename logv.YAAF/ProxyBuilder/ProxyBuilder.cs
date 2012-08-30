@@ -200,15 +200,13 @@ namespace logv.YAAF.ProxyBuilder
                                     where (attr.Intercept & AspectIntercept.Exception) == AspectIntercept.Exception
                                     select attr).ToList();
 
-            var manipulatingAspect = (from attr in attributes
-                                      where attr.ManupilatesState
-                                      select attr).ToList();
+            var intercepting = (from attr in attributes
+                                    where (attr.Intercept & AspectIntercept.Intercept) == AspectIntercept.Intercept
+                                    select attr).ToList();
 
-            if(manipulatingAspect.Count > 1)
-                throw new InvalidOperationException(string.Format("The interface member {0} has more than one manipulating aspect", methodInfo.Name));
+
 
             var localAspects = attributes.Where(a => a.Strategy == AspectStrategy.PerCall).GroupBy(item => item.Aspect).Select(g => g.First()).ToList();
-
             var tagetMethod = typeif.TargetMethods[index];
 
             var methodBuilder = builder.DefineMethod(methodInfo.Name, MethodAttributes.Public | MethodAttributes.HideBySig |
@@ -226,7 +224,7 @@ namespace logv.YAAF.ProxyBuilder
 
             LocalBuilder retVal = null;
 
-            if (methodInfo.ReturnType != typeof(void) && (epilogAspects.Any() || manipulatingAspect.Any()))
+            if (methodInfo.ReturnType != typeof(void) && (epilogAspects.Any()))
             {
                 retVal = il.DeclareLocal(methodInfo.ReturnType);
                 il.Emit(OpCodes.Ldnull);
@@ -254,15 +252,55 @@ namespace logv.YAAF.ProxyBuilder
             }
 
             var tryBlock = il.BeginExceptionBlock();
-            il.Emit(OpCodes.Ldarg_0);
-            il.Emit(OpCodes.Ldfld, fields[ProxyBuilderMemberName]);
+           
 
-            for (int i = 0; i < paramerters.Length; i++)
+            if (intercepting.Count == 1)
             {
-                il.Emit(OpCodes.Ldarg, (ushort)(i + 1));
-            }
+                var nested = this.DefineDelegateType(builder, tagetMethod);
+                var wrapper = il.DeclareLocal(nested.Item1);
+                var deleg = il.DeclareLocal(typeof(Action));
+                il.Emit(OpCodes.Newobj, nested.Item4);
+                il.Emit(OpCodes.Stloc, wrapper);
 
-            il.Emit(OpCodes.Callvirt, tagetMethod);
+                for (int i = 0; i < paramerters.Length; i++)
+                {
+                    il.Emit(OpCodes.Ldloc, wrapper);
+                    il.Emit(OpCodes.Ldarg, (ushort)(i + 1));
+                    il.Emit(OpCodes.Stfld, nested.Item1.GetField(paramerters[i].Name));
+                }
+
+                il.Emit(OpCodes.Ldloc, wrapper);
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldfld, fields[ProxyBuilderMemberName]);
+                il.Emit(OpCodes.Stfld, nested.Item3);
+
+                il.Emit(OpCodes.Ldloc, wrapper);
+                il.Emit(OpCodes.Ldftn, nested.Item2);
+                il.Emit(OpCodes.Newobj, typeof(Action).GetConstructor(new [] {typeof(object), typeof(IntPtr)}));
+                il.Emit(OpCodes.Stloc, deleg);
+
+                il.Emit(OpCodes.Ldloc, ctx);
+                il.Emit(OpCodes.Ldloc, deleg);
+                il.Emit(OpCodes.Stfld, typeof(AspectContext).GetField("_invoke"));
+
+                EmitAspecInvocation(fields, ctx, localsByType, intercepting[0], il, AspectIntercept.Intercept);
+            }
+            else if (intercepting.Count > 1)
+            {
+                throw new InvalidOperationException(string.Format("you can not have more than one intercepting aspec on {0}", tagetMethod.DeclaringType + tagetMethod.ToString()));
+            }
+            else
+            {
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldfld, fields[ProxyBuilderMemberName]);
+
+                for (int i = 0; i < paramerters.Length; i++)
+                {
+                    il.Emit(OpCodes.Ldarg, (ushort)(i + 1));
+                }
+
+                il.Emit(OpCodes.Callvirt, tagetMethod);   
+            }
 
             if (retVal != null)//safe return value
                 il.Emit(OpCodes.Stloc, retVal);
@@ -276,15 +314,10 @@ namespace logv.YAAF.ProxyBuilder
 
             if (retVal != null)//safe return value
             {
-                var asp = epilogAspects.FirstOrDefault(i => i.ManupilatesState);
-
-                if(asp !=null)
-                    EmitManipulate(methodInfo, fields, ctx, retVal, il, localsByType, asp);
-
                 EmitCtxAdd(retVal, ctx, il, AspectContext.ReturnValueName);
             }
 
-            foreach (var aspect in retVal != null ? epilogAspects.Where(asp => !asp.ManupilatesState) : epilogAspects)
+            foreach (var aspect in  epilogAspects)
             {
                 EmitAspecInvocation(fields, ctx, localsByType, aspect, il, AspectIntercept.Epilog);
             }
@@ -345,15 +378,6 @@ namespace logv.YAAF.ProxyBuilder
                     il.Emit(OpCodes.Ldfld, fields[exhandler.Aspect + AspectBackinfFieldSuffix]);
                 }
 
-                if (exhandler.ManupilatesState && retVal != null)
-                {
-                    il.Emit(OpCodes.Ldloc, ctx);
-                    il.Emit(OpCodes.Ldc_I4, (int)AspectIntercept.Exception);
-                    il.Emit(OpCodes.Callvirt, typeof(IManipulatingAspect).GetMethod("Manipulate"));
-                    il.Emit(OpCodes.Castclass, methodInfo.ReturnType);
-                    il.Emit(OpCodes.Stloc, retVal);
-                }
-                else
                 {
                     il.Emit(OpCodes.Ldloc, ctx);
                     il.Emit(OpCodes.Ldc_I4, (int)AspectIntercept.Exception);
@@ -369,25 +393,6 @@ namespace logv.YAAF.ProxyBuilder
             il.Emit(OpCodes.Rethrow); // nope, we throw it up the stack, this will prevent all epilog aspects from invocation
 
             il.MarkLabel(handled);
-        }
-
-        private static void EmitManipulate(MethodInfo methodInfo, Dictionary<string, FieldInfo> fields, LocalBuilder ctx, LocalBuilder retVal, ILGenerator il, Dictionary<Type, LocalBuilder> localsByType, AspectAttribute asp)
-        {
-            if (asp.Strategy == AspectStrategy.PerCall)
-            {
-                il.Emit(OpCodes.Ldloc, localsByType[asp.Aspect]);
-            }
-            else
-            {
-                il.Emit(OpCodes.Ldarg_0); //put 'this' on the stack to get the field
-                il.Emit(OpCodes.Ldfld, fields[asp.Aspect + AspectBackinfFieldSuffix]);
-            }
-
-            il.Emit(OpCodes.Ldloc, ctx);
-            il.Emit(OpCodes.Ldc_I4, (int)AspectIntercept.Exception);
-            il.Emit(OpCodes.Callvirt, typeof(IManipulatingAspect).GetMethod("Manipulate"));
-            il.Emit(OpCodes.Castclass, methodInfo.ReturnType);
-            il.Emit(OpCodes.Stloc, retVal);
         }
 
         private static void EmitCtxAdd(LocalBuilder retVal, LocalBuilder ctx, ILGenerator il, string name)
@@ -463,6 +468,42 @@ namespace logv.YAAF.ProxyBuilder
             stringBuilder.Replace('+', '_').Replace('[', '_').Replace(']', '_').Replace('*', '_').Replace('&', '_').Replace(',', '_').Replace('\\', '_');
             name = stringBuilder.ToString();
             return this._moduleBuilder.DefineType(name, TypeAttributes.Public | TypeAttributes.Sealed);
+        }
+
+        private Tuple<TypeBuilder, MethodInfo, FieldInfo, ConstructorBuilder> DefineDelegateType(TypeBuilder hostingType, MethodInfo toInvoke)
+        {
+            var nestedType = hostingType.DefineNestedType(toInvoke.Name + "InvokeWrapper",  TypeAttributes.AutoClass | TypeAttributes.Sealed | TypeAttributes.NestedPublic);
+            
+
+            var that = nestedType.DefineField("_that", toInvoke.DeclaringType, FieldAttributes.Public);
+
+            var fields = new Dictionary<string, FieldBuilder>();
+            var parameters = toInvoke.GetParameters();
+            foreach (ParameterInfo parameter in parameters)
+            {
+                var field = nestedType.DefineField(parameter.Name, parameter.ParameterType, FieldAttributes.Public);
+                fields.Add(parameter.Name, field);
+            }
+            var method = nestedType.DefineMethod("Run", MethodAttributes.Public);
+
+            var il = method.GetILGenerator();
+
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Ldfld, that);
+
+            foreach (var parameter in parameters)
+            {
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldfld, fields[parameter.Name]);
+            }
+
+            il.Emit(OpCodes.Callvirt, toInvoke);
+            il.Emit(OpCodes.Ret);
+
+            var ctor = nestedType.DefineDefaultConstructor(MethodAttributes.Public);
+            nestedType.CreateType();
+
+            return Tuple.Create(nestedType, method as MethodInfo, that as FieldInfo, ctor);
         }
     }
 

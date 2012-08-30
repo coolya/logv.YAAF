@@ -10,6 +10,8 @@ namespace logv.YAAF
         private readonly List<AspectParameter> _aspects;
         private readonly Type _returnType;
 
+        public Action _invoke;
+
 
         public AspectContext(string name, Type returnType, Type implemtingType)
         {
@@ -41,6 +43,11 @@ namespace logv.YAAF
         {
             get;
             set;
+        }
+
+        public Action Implementation
+        {
+            get { return _invoke; }
         }
 
         public bool IsVoid

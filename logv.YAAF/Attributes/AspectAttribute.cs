@@ -39,16 +39,6 @@ namespace logv.YAAF.Attributes
         }
 
         /// <summary>
-        /// Gets or sets a value indicating whether [manupilates state].
-        /// </summary>
-        /// <value><c>true</c> if [manupilates state]; otherwise, <c>false</c>.</value>
-        public bool ManupilatesState
-        {
-            get;
-            private set;
-        }
-
-        /// <summary>
         /// Initializes a new instance of the <see cref="AspectAttribute"/> class.
         /// </summary>
         /// <param name="aspect">The type of the aspect. Needs to implement IAspec if a non manipulating aspect, otherwise IManupulatinAspect</param>
@@ -57,22 +47,12 @@ namespace logv.YAAF.Attributes
         /// <param name="manupilatesState">if set to <c>true</c> the value of the context can be replaced by this aspect</param>
         public AspectAttribute(Type aspect, AspectIntercept behaivor, AspectStrategy strategy, bool manupilatesState)
         {
-            if(manupilatesState)
-            {
-                if (aspect.GetInterface(typeof(IManipulatingAspect).ToString()) == null)
-                    throw new ArgumentException(string.Format("{0} does not implement IManipulatingAspect", aspect));
-            }
-            else
-            {
                 if (aspect.GetInterface(typeof(IAspect).ToString()) == null)
                     throw new ArgumentException(string.Format("{0} does not implement IAspect", aspect));
-            }
-            
 
             this.Aspect = aspect;
             this.Intercept = behaivor;
             this.Strategy = strategy;
-            this.ManupilatesState = manupilatesState;
         }
     }
 
@@ -93,7 +73,9 @@ namespace logv.YAAF.Attributes
         /// <summary>
         /// The Aspect is invoked only when the target throws an Exception
         /// </summary>
-        Exception = 4
+        Exception = 4,
+
+        Intercept = 8,
     }
 
     /// <summary>
