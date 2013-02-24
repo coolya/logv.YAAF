@@ -4,6 +4,7 @@ using System.Collections.Specialized;
 using System.Configuration;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using System.Text;
 
 namespace logv.YAAF.ServiceLocator
@@ -12,6 +13,7 @@ namespace logv.YAAF.ServiceLocator
     {
         private readonly Func<Type, Type> _locator;
 
+        private readonly ReaderWriterLockSlim _singletoneLock = new ReaderWriterLockSlim();
         private readonly Dictionary<Type, object> _singletonesByType;
         private readonly Dictionary<Type, object> _constructorsByType;
         private readonly Dictionary<Type, bool> _typeIsAop;
@@ -31,7 +33,7 @@ namespace logv.YAAF.ServiceLocator
             _defaultContext = ctx;
         }
 
-        private static Type DefaultLocator(Type t)
+        protected static Type DefaultLocator(Type t)
         {
             var section = ConfigurationManager.GetSection("YAAF") as NameValueCollection;
 
@@ -62,7 +64,7 @@ namespace logv.YAAF.ServiceLocator
             return Type.GetType(type, true);
         }
 
-        private ServiceLocatorContext(Func<Type, Type> locator)
+        protected ServiceLocatorContext(Func<Type, Type> locator)
         {
             _locator = locator;
             _singletonesByType = new Dictionary<Type, object>();
@@ -70,7 +72,7 @@ namespace logv.YAAF.ServiceLocator
             _typeIsAop = new Dictionary<Type, bool>();
         }
 
-        private ServiceLocatorContext(Dictionary<Type, object> singletonesByType, Dictionary<Type, bool> typeIsAop, Func<Type, Type> locator)
+        protected ServiceLocatorContext(Dictionary<Type, object> singletonesByType, Dictionary<Type, bool> typeIsAop, Func<Type, Type> locator)
         {
             _locator = locator;
             _singletonesByType = singletonesByType;
@@ -90,7 +92,9 @@ namespace logv.YAAF.ServiceLocator
 
         protected virtual bool? TypeIsAopInternal(Type t)
         {
-            return this._typeIsAop.ContainsKey(t) ? this._typeIsAop[t] : (bool?)null;
+            var ret = this._typeIsAop.ContainsKey(t) ? this._typeIsAop[t] : (bool?)null;
+            return ret;
+
         }
 
         internal bool? TypeIsAop(Type t)
@@ -100,7 +104,15 @@ namespace logv.YAAF.ServiceLocator
 
         protected virtual void AddAopTypeInternal(Type t, bool isAop)
         {
-            _typeIsAop.Add(t, isAop);
+            try
+            {
+                _typeIsAop.Add(t, isAop);
+            }
+            catch (Exception)
+            {
+
+            }
+
         }
 
         internal void AddAopType(Type t, bool isAop)
@@ -110,10 +122,12 @@ namespace logv.YAAF.ServiceLocator
 
         protected virtual T GetSingletoneInternal<T>()
         {
+            T ret = default(T);
+            _singletoneLock.EnterReadLock();
             if (this._singletonesByType.ContainsKey(typeof(T)))
-                return (T)this._singletonesByType[typeof(T)];
-
-            return default(T);
+                ret = (T)this._singletonesByType[typeof(T)];
+            _singletoneLock.ExitReadLock();
+            return ret;
         }
 
         internal T GetSingletone<T>()
@@ -123,7 +137,16 @@ namespace logv.YAAF.ServiceLocator
 
         protected virtual void AddSingletoneInternal<T>(T instance)
         {
-            this._singletonesByType.Add(typeof(T), instance);
+            _singletoneLock.EnterWriteLock();
+            try
+            {
+                this._singletonesByType.Add(typeof(T), instance);
+            }
+            catch { }
+            finally
+            {
+                _singletoneLock.ExitWriteLock();                
+            }
         }
 
         internal void AddSingletone<T>(T instance)
@@ -133,7 +156,11 @@ namespace logv.YAAF.ServiceLocator
 
         protected virtual void AddConstructorToCacheInternal<T>(Func<T> func)
         {
-            _constructorsByType.Add(typeof(T), func);
+            try
+            {
+                _constructorsByType.Add(typeof(T), func);
+            }
+            catch (Exception) { }
         }
 
         internal void AddConstructorToCache<T>(Func<T> func)
@@ -161,7 +188,7 @@ namespace logv.YAAF.ServiceLocator
 
         public ServiceLocatorContext Duplicate()
         {
-            return new ServiceLocatorContext(this._constructorsByType, this._typeIsAop, this._locator);
+            return new ServiceLocatorContext(this._constructorsByType.ToDictionary( i => i.Key, i => i.Value) , this._typeIsAop.ToDictionary( i => i.Key, i => i.Value), this._locator);
         }
     }
 }
